@@ -155,3 +155,8 @@ async function storeInMongo(prompt, response) {
     console.error("Error:", err);
   }
 })();
+
+module.exports = {
+  runAssistantWithPrompt,
+  storeInMongo
+};
