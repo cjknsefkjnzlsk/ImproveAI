@@ -10,7 +10,7 @@ const DB_NAME = "ai_interactions";
 const COLLECTION_NAME = "qa_pairs";
 
 // Get a prompt from a local model called "Trainer"
-async function getPromptFromTrainer() {
+async function getPromptFromTrainer(companyText) {
   const res = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
     headers: {
@@ -18,7 +18,7 @@ async function getPromptFromTrainer() {
     },
     body: JSON.stringify({
       model: "trainer",
-      prompt: "Generate a question about AI ethics.",
+      prompt: "Generate questions about the company given the following text: " + companyText,
       stream: false
     })
   });
@@ -137,26 +137,10 @@ async function storeInMongo(prompt, response) {
 }
 
 // Main runner
-(async () => {
-  try {
-    console.log("Getting prompt from Trainer...");
-    const prompt = await getPromptFromTrainer();
-    console.log("Prompt from Trainer:", prompt);
 
-    console.log("Sending prompt to OpenAI Assistant...");
-    const response = await runAssistantWithPrompt(prompt);
-    console.log("Response from Assistant:", response);
-
-    console.log("Storing in MongoDB...");
-    await storeInMongo(prompt, response);
-
-    console.log("Q&A saved successfully:", { prompt, response });
-  } catch (err) {
-    console.error("Error:", err);
-  }
-})();
 
 module.exports = {
   runAssistantWithPrompt,
-  storeInMongo
+  storeInMongo,
+  getPromptFromTrainer
 };

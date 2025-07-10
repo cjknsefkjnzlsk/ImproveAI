@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
-const { runAssistantWithPrompt, storeInMongo } = require('./ai');
+const { runAssistantWithPrompt, storeInMongo, getPromptFromTrainer } = require('./ai');
 
 const app = express();
 app.use(cors());
@@ -29,7 +29,8 @@ app.post('/generate-examples', upload.single('file'), async (req, res) => {
       fs.unlinkSync(req.file.path); // Clean up
     }
     // Send to Ollama and OpenAI (simulate: generate 3 examples)
-    const prompt = `Given the following company info, generate 3 example customer questions and answers.\n\n${companyText}`;
+    
+    const prompt = await getPromptFromTrainer();
     const response = await runAssistantWithPrompt(prompt);
     // Split into examples (assume numbered list or Q&A pairs)
     const examples = response.split(/\n\d+\.\s|\nQ\d+:|\n- /).filter(Boolean).map(s => s.trim()).filter(Boolean);
