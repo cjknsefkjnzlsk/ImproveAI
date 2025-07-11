@@ -13,6 +13,7 @@ const upload = multer({ dest: 'uploads/' });
 
 // POST /generate-examples
 app.post('/generate-examples', upload.single('file'), async (req, res) => {
+  console.log('POST /generate-examples called');
   try {
     let companyText = req.body.companyText || '';
     if (req.file) {
@@ -28,14 +29,27 @@ app.post('/generate-examples', upload.single('file'), async (req, res) => {
       }
       fs.unlinkSync(req.file.path); // Clean up
     }
-    // Send to Ollama and OpenAI (simulate: generate 3 examples)
-    
-    const prompt = await getPromptFromTrainer();
-    const response = await runAssistantWithPrompt(prompt);
-    // Split into examples (assume numbered list or Q&A pairs)
-    const examples = response.split(/\n\d+\.\s|\nQ\d+:|\n- /).filter(Boolean).map(s => s.trim()).filter(Boolean);
-    res.json({ examples });
+    // Generate Trainer (Ollama) questions
+    const trainerPrompt = `Given the following company info, generate a list of 3 example customer questions (not answers) about the company. Only output the questions, each on a new line.\n\n${companyText}`;
+    const trainerQuestionsRaw = await getPromptFromTrainer(trainerPrompt);
+    console.log('Trainer output:', trainerQuestionsRaw);
+    if (!trainerQuestionsRaw) {
+      console.error('Trainer did not return any questions!');
+      return res.status(500).json({ error: 'Trainer did not return any questions.' });
+    }
+    const trainerQuestions = trainerQuestionsRaw
+      .split('\n')
+      .map(q => q.trim())
+      .filter(q => q.length > 0);
+    const qaPairs = [];
+    for (const question of trainerQuestions) {
+      const answer = await runAssistantWithPrompt(question);
+      qaPairs.push({ question, answer });
+    }
+    console.log('Sending to frontend:', qaPairs);
+    res.json({ qaPairs });
   } catch (err) {
+    console.error('Error in /generate-examples:', err);
     res.status(500).json({ error: err.message });
   }
 });

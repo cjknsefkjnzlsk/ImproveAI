@@ -30,6 +30,8 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showRequired, setShowRequired] = useState(false);
+  const [trainerQuestions, setTrainerQuestions] = useState(''); // New state for Trainer questions
+  const [qaPairs, setQaPairs] = useState([]); // New state for Q&A pairs
 
   // Refs for all question and answer textareas
   const questionRefs = useRef([]);
@@ -37,7 +39,7 @@ function App() {
 
   // Auto-resize all textareas after each render
   useEffect(() => {
-    examples.forEach((ex, i) => {
+    qaPairs.forEach((pair, i) => {
       const qEl = questionRefs.current[i];
       if (qEl) {
         qEl.style.height = 'auto';
@@ -51,17 +53,17 @@ function App() {
         }
       }
     });
-  }, [displayed, examples]);
+  }, [qaPairs]);
 
   // Typewriter and fade-in effect on generation only
   useEffect(() => {
-    if (!isAnimating || examples.length === 0) return;
+    if (!isAnimating || qaPairs.length === 0) return;
     let cancelled = false;
-    const newDisplayed = examples.map(() => ({ question: '', answer: '', visible: false }));
+    const newDisplayed = qaPairs.map(() => ({ question: '', answer: '', visible: false }));
     setDisplayed(newDisplayed);
 
     const typeWriter = async (i) => {
-      if (cancelled || i >= examples.length) {
+      if (cancelled || i >= qaPairs.length) {
         setIsAnimating(false);
         return;
       }
@@ -74,7 +76,7 @@ function App() {
       // Typewriter for question
       await new Promise(resolve => {
         let idx = 0;
-        const full = examples[i].question;
+        const full = qaPairs[i].question;
         const step = () => {
           if (cancelled) return;
           setDisplayed(disp => {
@@ -95,7 +97,7 @@ function App() {
       if (i !== 0) {
         await new Promise(resolve => {
           let idx = 0;
-          const full = examples[i].answer;
+          const full = qaPairs[i].answer;
           const step = () => {
             if (cancelled) return;
             setDisplayed(disp => {
@@ -119,7 +121,7 @@ function App() {
     setTimeout(() => typeWriter(0), 120);
     return () => { cancelled = true; };
     // eslint-disable-next-line
-  }, [isAnimating, examples]);
+  }, [isAnimating, qaPairs]);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -145,6 +147,7 @@ function App() {
     setError('');
     setExamples([]);
     setDisplayed([]);
+    setTrainerQuestions(''); // Clear previous trainer questions
     try {
       const formData = new FormData();
       formData.append('companyText', companyText);
@@ -155,7 +158,8 @@ function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        setExamples((data.examples || []).map(splitExample));
+        setQaPairs((data.qaPairs || []).map(pair => ({ question: pair.question, answer: pair.answer })));
+        setTrainerQuestions(data.trainerQuestions || ''); // Set trainer questions
         setIsAnimating(true);
       } else {
         setError(data.error || 'Failed to generate examples.');
@@ -238,6 +242,7 @@ function App() {
     setIsAnimating(false);
     setShowRequired(false);
     setError('');
+    setTrainerQuestions(''); // Clear trainer questions on reset
   };
 
   return (
@@ -277,68 +282,59 @@ function App() {
             </button>
           </form>
           {error && <div className="error-msg" style={{ textAlign: 'center' }}>{error}</div>}
-          {examples.length > 0 && (
+          {trainerQuestions && (
+            <div className="trainer-section" style={{ width: '100%', maxWidth: 500, margin: '0 auto 24px auto', background: '#232136', borderRadius: 8, padding: 16 }}>
+              <h3 style={{ textAlign: 'center', marginBottom: 8 }}>Trainer (Ollama) Questions</h3>
+              <ul style={{ color: '#e0e0e0', background: 'none', fontSize: 15, paddingLeft: 20 }}>
+                {trainerQuestions
+                  .split(/\n|(?:^|\n)\d+\.\s+/) // split on newlines or numbered list
+                  .map(q => q.trim())
+                  .filter(q => q.length > 0)
+                  .map((q, idx) => (
+                    <li key={idx}>{q}</li>
+                  ))}
+              </ul>
+            </div>
+          )}
+          {qaPairs.length > 0 && (
             <div className="examples-section" style={{ width: '100%', maxWidth: 500, margin: '0 auto' }}>
               <h3 style={{ textAlign: 'center' }}>Edit Example Responses</h3>
-              {examples.map((ex, i) => (
+              {qaPairs.map((pair, i) => (
                 <div
                   key={i}
                   className="example-edit-group fade-in"
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24, width: '100%',
-                    opacity: displayed[i]?.visible ? 1 : 0,
+                    opacity: 1,
                     transition: 'opacity 0.6s',
                   }}
                 >
                   <div style={{ width: '100%', maxWidth: 400 }}>
-                    {i === 0 ? (
-                      <>
-                        <label style={{ fontWeight: 600, marginBottom: 4, display: 'block' }}>Your AI Helper</label>
-                        <textarea
-                          ref={el => questionRefs.current[i] = el}
-                          value={displayed[i]?.question || ''}
-                          onChange={e => handleExampleChange(i, 'question', e.target.value)}
-                          className="example-textarea"
-                          style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
-                          rows={1}
-                          onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <label style={{ fontWeight: 600, marginBottom: 4, display: 'block' }}>Question</label>
-                        <textarea
-                          ref={el => questionRefs.current[i] = el}
-                          value={displayed[i]?.question || ''}
-                          onChange={e => handleExampleChange(i, 'question', e.target.value)}
-                          className="example-textarea"
-                          style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
-                          rows={1}
-                          onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-                        />
-                        <label style={{ fontWeight: 600, margin: '8px 0 4px 0', display: 'block' }}>Answer</label>
-                        <textarea
-                          ref={el => answerRefs.current[i] = el}
-                          value={displayed[i]?.answer || ''}
-                          onChange={e => handleExampleChange(i, 'answer', e.target.value)}
-                          className="example-textarea"
-                          style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
-                          rows={1}
-                          onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-                        />
-                      </>
-                    )}
+                    <label style={{ fontWeight: 600, marginBottom: 4, display: 'block' }}>Question</label>
+                    <textarea
+                      value={pair.question}
+                      readOnly
+                      className="example-textarea"
+                      style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
+                      rows={1}
+                    />
+                    <label style={{ fontWeight: 600, margin: '8px 0 4px 0', display: 'block' }}>Answer</label>
+                    <textarea
+                      value={pair.answer}
+                      readOnly
+                      className="example-textarea"
+                      style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
+                      rows={1}
+                    />
                   </div>
-                  {i !== 0 && (
-                    <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                      <button type="button" className="btn approve-btn" onClick={() => handleApprove(i)}>
-                        <span>Approve</span>
-                      </button>
-                      <button type="button" className="btn deny-btn" onClick={() => handleDeny(i)}>
-                        <span>Deny</span>
-                      </button>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                    <button type="button" className="btn approve-btn">
+                      <span>Approve</span>
+                    </button>
+                    <button type="button" className="btn deny-btn">
+                      <span>Deny</span>
+                    </button>
+                  </div>
                 </div>
               ))}
               <button className="btn save-btn" onClick={handleSave} disabled={saving} style={{ width: 200, margin: '18px auto' }}>
