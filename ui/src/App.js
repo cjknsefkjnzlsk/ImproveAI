@@ -45,12 +45,10 @@ function App() {
         qEl.style.height = 'auto';
         qEl.style.height = qEl.scrollHeight + 'px';
       }
-      if (i !== 0) {
-        const aEl = answerRefs.current[i];
-        if (aEl) {
-          aEl.style.height = 'auto';
-          aEl.style.height = aEl.scrollHeight + 'px';
-        }
+      const aEl = answerRefs.current[i];
+      if (aEl) {
+        aEl.style.height = 'auto';
+        aEl.style.height = aEl.scrollHeight + 'px';
       }
     });
   }, [qaPairs]);
@@ -158,7 +156,7 @@ function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        setQaPairs((data.qaPairs || []).map(pair => ({ question: pair.question, answer: pair.answer })));
+        setQaPairs((data.qaPairs || []).map(pair => ({ question: pair.question, answer: pair.answer, approved: true })));
         setTrainerQuestions(data.trainerQuestions || ''); // Set trainer questions
         setIsAnimating(true);
       } else {
@@ -198,17 +196,16 @@ function App() {
   };
 
   const handleApprove = (i) => {
-    const newExamples = [...examples];
-    newExamples[i].approved = true;
-    setExamples(newExamples);
+    setQaPairs(prev => {
+      const arr = [...prev];
+      arr[i].approved = true;
+      return arr;
+    });
   };
 
   const handleDeny = (i) => {
-    const newExamples = [...examples];
-    newExamples.splice(i, 1);
-    setExamples(newExamples);
-    setDisplayed(disp => {
-      const arr = [...disp];
+    setQaPairs(prev => {
+      const arr = [...prev];
       arr.splice(i, 1);
       return arr;
     });
@@ -218,7 +215,7 @@ function App() {
     setSaving(true);
     setError('');
     try {
-      const approvedExamples = examples.filter(ex => ex.approved).map(ex => ({ question: ex.question, answer: ex.answer }));
+      const approvedExamples = qaPairs.filter(ex => ex.approved).map(ex => ({ question: ex.question, answer: ex.answer }));
       const res = await fetch('http://localhost:3001/save-examples', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -243,6 +240,7 @@ function App() {
     setShowRequired(false);
     setError('');
     setTrainerQuestions(''); // Clear trainer questions on reset
+    setQaPairs([]); // Clear Q&A pairs
   };
 
   return (
@@ -313,25 +311,35 @@ function App() {
                     <label style={{ fontWeight: 600, marginBottom: 4, display: 'block' }}>Question</label>
                     <textarea
                       value={pair.question}
-                      readOnly
+                      ref={el => questionRefs.current[i] = el}
                       className="example-textarea"
                       style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
                       rows={1}
+                      onChange={e => {
+                        const newPairs = [...qaPairs];
+                        newPairs[i].question = e.target.value;
+                        setQaPairs(newPairs);
+                      }}
                     />
                     <label style={{ fontWeight: 600, margin: '8px 0 4px 0', display: 'block' }}>Answer</label>
                     <textarea
                       value={pair.answer}
-                      readOnly
+                      ref={el => answerRefs.current[i] = el}
                       className="example-textarea"
                       style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
                       rows={1}
+                      onChange={e => {
+                        const newPairs = [...qaPairs];
+                        newPairs[i].answer = e.target.value;
+                        setQaPairs(newPairs);
+                      }}
                     />
                   </div>
                   <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                    <button type="button" className="btn approve-btn">
+                    <button type="button" className="btn approve-btn" onClick={() => handleApprove(i)}>
                       <span>Approve</span>
                     </button>
-                    <button type="button" className="btn deny-btn">
+                    <button type="button" className="btn deny-btn" onClick={() => handleDeny(i)}>
                       <span>Deny</span>
                     </button>
                   </div>

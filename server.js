@@ -62,7 +62,7 @@ app.post('/save-examples', async (req, res) => {
       return res.status(400).json({ error: 'No examples provided.' });
     }
     for (const ex of examples) {
-      await storeInMongo('User-edited example', ex);
+      await storeInMongo(ex.question, ex.answer);
     }
     res.json({ success: true });
   } catch (err) {
